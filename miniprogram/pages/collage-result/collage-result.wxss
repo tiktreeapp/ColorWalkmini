@@ -1,0 +1,31 @@
+page {
+  background: #f7f7f7;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.result-image {
+  width: 100%;
+  border-radius: 16rpx;
+}
+
+.empty {
+  height: 600rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  background: #fff;
+  border-radius: 16rpx;
+}
+
+.save-btn {
+  margin-top: 20rpx;
+  background: #111;
+  color: #fff;
+  border-radius: 14rpx;
+}

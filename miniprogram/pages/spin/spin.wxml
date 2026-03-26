@@ -1,0 +1,19 @@
+<view class="page">
+  <view class="section">
+    <text class="section-title">七彩转盘</text>
+    <view class="wheel-wrap">
+      <canvas canvas-id="wheelCanvas" class="wheel-canvas" bindtap="onWheelTap"></canvas>
+      <button class="spin-btn {{spinning ? 'spinning' : ''}}" bindtap="onSpinStart" disabled="{{spinning}}">{{spinning ? '转动中...' : '开始转动'}}</button>
+      <button class="share-btn" bindtap="onShowShareGuide" style="background: {{shareButtonColor}};">分享好友</button>
+    </view>
+    <view class="result">
+      <text class="result-prefix">{{resultPrefix}}</text>
+      <text class="result-color" style="color: {{resultColor}};">{{wheelResult}}</text>
+    </view>
+  </view>
+
+  <view class="share-guide-mask" wx:if="{{shareGuideVisible}}" bindtap="onHideShareGuide">
+    <view class="guide-arrow"></view>
+    <text class="guide-text">点击右上角 ... ，分享好友或群聊</text>
+  </view>
+</view>

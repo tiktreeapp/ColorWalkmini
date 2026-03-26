@@ -1,0 +1,36 @@
+{
+  "pages": [
+    "pages/spin/spin",
+    "pages/collage/collage",
+    "pages/collage-result/collage-result",
+    "pages/logs/logs"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "ColorWalk",
+    "navigationBarBackgroundColor": "#ffffff"
+  },
+  "tabBar": {
+    "color": "#7a7a7a",
+    "selectedColor": "#111111",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/spin/spin",
+        "text": "小决定转盘",
+        "iconPath": "assets/tab/spin.png",
+        "selectedIconPath": "assets/tab/spin-active.png"
+      },
+      {
+        "pagePath": "pages/collage/collage",
+        "text": "照片拼图",
+        "iconPath": "assets/tab/collage.png",
+        "selectedIconPath": "assets/tab/collage-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "componentFramework": "glass-easel",
+  "lazyCodeLoading": "requiredComponents"
+}

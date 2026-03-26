@@ -1,0 +1,5 @@
+<view class="page">
+  <image wx:if="{{imagePath}}" src="{{imagePath}}" mode="widthFix" class="result-image"></image>
+  <view wx:else class="empty">暂无拼图结果</view>
+  <button class="save-btn" bindtap="onSaveImage">保存到相册</button>
+</view>

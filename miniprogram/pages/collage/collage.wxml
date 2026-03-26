@@ -1,0 +1,54 @@
+<view class="page-root">
+  <scroll-view class="page" scroll-y>
+    <view class="section">
+      <view class="inline-field">
+        <text class="inline-label">颜色</text>
+        <view class="inline-control color-control">
+          <view class="chip" style="background: {{palette[selectedColorIndex].hex}};"></view>
+          <text class="color-name">{{palette[selectedColorIndex].name}}</text>
+          <picker mode="selector" range="{{palette}}" range-key="name" value="{{selectedColorIndex}}" bindchange="onPickColor">
+            <view class="picker-trigger">▼</view>
+          </picker>
+        </view>
+      </view>
+
+      <view class="inline-field">
+        <text class="inline-label">当下心情</text>
+        <input class="inline-control mood-input" value="{{moodText}}" bindinput="onMoodInput" maxlength="32" />
+      </view>
+
+      <view class="field">
+        <text class="label">模版选择</text>
+        <view class="template-row">
+          <block wx:for="{{templates}}" wx:key="id">
+            <view class="template-item {{selectedTemplateId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="onTemplateSelect">{{item.label}}</view>
+          </block>
+        </view>
+      </view>
+
+      <view class="slot-board slot-template-{{selectedTemplateId}}">
+        <block wx:for="{{slots}}" wx:key="index">
+          <view class="slot-item slot-item-{{selectedTemplateId}}" data-index="{{item.index}}" bindtap="onPickSlotImage">
+            <image wx:if="{{item.path}}" src="{{item.path}}" mode="aspectFill" class="slot-image"></image>
+            <view wx:else class="slot-empty">
+              <text class="slot-plus">+</text>
+              <text class="slot-tip">选择照片</text>
+            </view>
+          </view>
+        </block>
+      </view>
+
+      <view class="output" wx:if="{{composedImagePath}}">
+        <image src="{{composedImagePath}}" mode="widthFix" class="output-image"></image>
+      </view>
+    </view>
+
+    <canvas canvas-id="composeCanvas" class="compose-canvas"></canvas>
+  </scroll-view>
+
+  <view class="action-bar">
+    <button class="action-btn" bindtap="onChooseImages">多图上传</button>
+    <button class="action-btn" bindtap="onComposeImage">生成拼图</button>
+    <button class="action-btn" bindtap="onSaveImage">保存相册</button>
+  </view>
+</view>
