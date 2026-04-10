@@ -1,10 +1,26 @@
 <view class="page">
+  <view class="mini-tip-banner" wx:if="{{miniProgramTipVisible}}">
+    <text class="mini-tip-copy">经常结伴Walk，点</text>
+    <view class="mini-tip-capsule">
+      <view class="mini-tip-capsule-left">
+        <text class="mini-tip-dot"></text>
+        <text class="mini-tip-dot"></text>
+        <text class="mini-tip-dot"></text>
+      </view>
+      <view class="mini-tip-capsule-divider"></view>
+    </view>
+    <text class="mini-tip-copy">- 添加到我的小程序</text>
+    <view class="mini-tip-close" bindtap="onCloseMiniProgramTip">×</view>
+  </view>
+
   <view class="section">
-    <text class="section-title">七彩转盘</text>
+    <view class="section-head">
+      <text class="section-title">七彩转盘</text>
+    </view>
     <view class="wheel-wrap">
       <canvas canvas-id="wheelCanvas" class="wheel-canvas" bindtap="onWheelTap"></canvas>
       <button class="spin-btn {{spinning ? 'spinning' : ''}}" bindtap="onSpinStart" disabled="{{spinning}}">{{spinning ? '转动中...' : '开始转动'}}</button>
-      <button class="share-btn" bindtap="onShowShareGuide" style="background: {{shareButtonColor}};">分享好友</button>
+      <button class="share-btn" bindtap="onShowShareGuide" style="background: {{shareButtonColor}};">{{shareButtonText}}</button>
     </view>
     <view class="result">
       <text class="result-prefix">{{resultPrefix}}</text>

@@ -8,18 +8,88 @@ page {
   box-sizing: border-box;
 }
 
+.mini-tip-banner {
+  position: relative;
+  width: 100%;
+  height: 36px;
+  margin-bottom: 12rpx;
+  padding: 0 28rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid #dcdcdc;
+  background: #ffffff;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+}
+
 .section {
   background: #fff;
   border-radius: 24rpx;
   padding: 28rpx;
 }
 
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 18rpx;
+}
+
 .section-title {
   font-size: 38rpx;
   font-weight: 700;
-  margin-bottom: 18rpx;
   display: block;
   color: #111;
+}
+
+.mini-tip-close {
+  margin-left: auto;
+  width: 20rpx;
+  height: 20rpx;
+  font-size: 16rpx;
+  line-height: 20rpx;
+  text-align: center;
+  color: #888;
+}
+
+.mini-tip-copy {
+  font-size: 14px;
+  line-height: 1;
+  color: #6b6b6b;
+}
+
+.mini-tip-capsule {
+  display: inline-flex;
+  align-items: center;
+  width: 34rpx;
+  height: 18rpx;
+  margin: 0 8rpx;
+  padding: 0 4rpx;
+  border: 1rpx solid #bdbdbd;
+  border-radius: 999rpx;
+  box-sizing: border-box;
+}
+
+.mini-tip-capsule-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 2rpx;
+  padding-right: 4rpx;
+}
+
+.mini-tip-capsule-divider {
+  width: 1rpx;
+  height: 10rpx;
+  background: #bdbdbd;
+}
+
+.mini-tip-dot {
+  width: 3rpx;
+  height: 3rpx;
+  border-radius: 50%;
+  background: #6b6b6b;
+  display: inline-block;
 }
 
 .wheel-wrap {

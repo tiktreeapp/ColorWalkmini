@@ -37,12 +37,15 @@ Page({
     wheelResult: '等待转盘为你挑选',
     resultColor: '#111111',
     shareButtonColor: '#111111',
+    shareButtonText: '分享好友',
     centerText: '开始',
     centerIsEmoji: false,
     shareGuideVisible: false,
+    miniProgramTipVisible: true,
   },
 
   onLoad() {
+    const miniProgramTipClosed = wx.getStorageSync('miniProgramTipClosed')
     spinAudio = wx.createInnerAudioContext()
     spinAudio.src = SPIN_SOUND_SRC
     spinAudio.loop = true
@@ -56,7 +59,15 @@ Page({
       wx.showToast({ title: '音效文件缺失，请检查 assets/audio', icon: 'none' })
     })
     currentRotationDeg = 0
+    if (miniProgramTipClosed) {
+      this.setData({ miniProgramTipVisible: false })
+    }
     this.drawWheel(currentRotationDeg)
+  },
+
+  onCloseMiniProgramTip() {
+    wx.setStorageSync('miniProgramTipClosed', true)
+    this.setData({ miniProgramTipVisible: false })
   },
 
   onUnload() {
@@ -183,6 +194,7 @@ Page({
         wheelResult: PALETTE[targetIndex].name,
         resultColor: PALETTE[targetIndex].hex,
         shareButtonColor: PALETTE[targetIndex].hex,
+        shareButtonText: '和朋友去拍照',
         centerText: '开始',
         centerIsEmoji: false,
       })

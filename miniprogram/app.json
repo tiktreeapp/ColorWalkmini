@@ -31,6 +31,7 @@
     ]
   },
   "style": "v2",
+  "__usePrivacyCheck__": true,
   "componentFramework": "glass-easel",
   "lazyCodeLoading": "requiredComponents"
 }

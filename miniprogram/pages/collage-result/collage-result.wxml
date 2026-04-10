@@ -2,4 +2,20 @@
   <image wx:if="{{imagePath}}" src="{{imagePath}}" mode="widthFix" class="result-image"></image>
   <view wx:else class="empty">暂无拼图结果</view>
   <button class="save-btn" bindtap="onSaveImage">保存到相册</button>
+  <button class="share-btn" open-type="share">分享拼图给朋友</button>
+
+  <view class="privacy-mask" wx:if="{{privacyPopupVisible}}">
+    <view class="privacy-card">
+      <text class="privacy-title">用户隐私保护提示</text>
+      <view class="privacy-copy">
+        <text>为实现保存拼图到相册功能，需要你先阅读并同意</text>
+        <text class="privacy-link" bindtap="onOpenPrivacyContract">《用户隐私保护指引》</text>
+        <text>。</text>
+      </view>
+      <view class="privacy-actions">
+        <button class="privacy-btn secondary" bindtap="onDeclinePrivacy">暂不同意</button>
+        <button class="privacy-btn primary" bindtap="onAgreePrivacy">同意并继续</button>
+      </view>
+    </view>
+  </view>
 </view>

@@ -29,3 +29,72 @@ page {
   color: #fff;
   border-radius: 14rpx;
 }
+
+.share-btn {
+  margin-top: 16rpx;
+  background: #fff;
+  color: #111;
+  border-radius: 14rpx;
+  border: 1rpx solid #dcdcdc;
+}
+
+.privacy-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx;
+  z-index: 40;
+}
+
+.privacy-card {
+  width: 100%;
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 36rpx 28rpx;
+  box-sizing: border-box;
+}
+
+.privacy-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #111;
+}
+
+.privacy-copy {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #555;
+}
+
+.privacy-link {
+  color: #2f9b59;
+}
+
+.privacy-actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 26rpx;
+}
+
+.privacy-btn {
+  flex: 1;
+  border-radius: 14rpx;
+  font-size: 26rpx;
+  line-height: 2.1;
+}
+
+.privacy-btn.secondary {
+  background: #f5f5f5;
+  color: #222;
+}
+
+.privacy-btn.primary {
+  background: #111;
+  color: #fff;
+}

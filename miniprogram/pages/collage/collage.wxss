@@ -11,7 +11,7 @@ page {
 .page {
   height: 100vh;
   box-sizing: border-box;
-  padding: 24rpx 24rpx 220rpx;
+  padding: 24rpx 24rpx 156rpx;
 }
 
 .section {
@@ -87,9 +87,18 @@ page {
   margin-bottom: 12rpx;
 }
 
+.template-field {
+  align-items: flex-start;
+}
+
 .template-row {
   display: flex;
   gap: 12rpx;
+}
+
+.template-row.compact {
+  flex: 1;
+  justify-content: flex-start;
 }
 
 .template-item {
@@ -99,6 +108,13 @@ page {
   border-radius: 14rpx;
   border: 1rpx solid #e8e8e8;
   font-size: 28rpx;
+}
+
+.template-row.compact .template-item {
+  flex: 0 0 132rpx;
+  padding: 12rpx 0;
+  font-size: 24rpx;
+  border-radius: 999rpx;
 }
 
 .template-item.active {
@@ -139,6 +155,10 @@ page {
   overflow: hidden;
   background: #f0f0f0;
   position: relative;
+}
+
+.slot-item.swap-selected {
+  box-shadow: 0 0 0 4rpx #2f9b59 inset;
 }
 
 .slot-item::before {
@@ -201,11 +221,8 @@ page {
   display: flex;
   gap: 12rpx;
   align-items: center;
-  background: rgba(235, 235, 235, 0.85);
-  border-radius: 14rpx;
   height: 52px;
   box-sizing: border-box;
-  padding: 0 8rpx;
   z-index: 20;
 }
 
@@ -224,4 +241,65 @@ page {
   top: -9999rpx;
   width: 1080rpx;
   height: 1440rpx;
+}
+
+.privacy-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx;
+  z-index: 40;
+}
+
+.privacy-card {
+  width: 100%;
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 36rpx 28rpx;
+  box-sizing: border-box;
+}
+
+.privacy-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #111;
+}
+
+.privacy-copy {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #555;
+}
+
+.privacy-link {
+  color: #2f9b59;
+}
+
+.privacy-actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 26rpx;
+}
+
+.privacy-btn {
+  flex: 1;
+  border-radius: 14rpx;
+  font-size: 26rpx;
+  line-height: 2.1;
+}
+
+.privacy-btn.secondary {
+  background: #f5f5f5;
+  color: #222;
+}
+
+.privacy-btn.primary {
+  background: #111;
+  color: #fff;
 }

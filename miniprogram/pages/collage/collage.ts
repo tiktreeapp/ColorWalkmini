@@ -42,16 +42,34 @@ Page({
     slots: [] as ImageSlot[],
     composedImagePath: '',
     nowLabel: '',
+    privacyPopupVisible: false,
+    pendingPrivacyAction: '' as '' | 'choose' | 'pick' | 'save',
+    pendingSlotIndex: -1,
+    swapSourceIndex: -1,
   },
 
   onLoad() {
     this.refreshNowLabel()
     this.syncColorFromSpinResult()
     this.setData({ slots: this.buildSlots([], this.data.selectedTemplateId) })
+    this.maybeShowPrivacyPopup()
   },
 
   onShow() {
     this.syncColorFromSpinResult()
+    this.maybeShowPrivacyPopup()
+  },
+
+  maybeShowPrivacyPopup() {
+    const accepted = wx.getStorageSync('privacyConsentAccepted')
+    if (accepted || this.data.privacyPopupVisible) {
+      return
+    }
+    this.setData({
+      privacyPopupVisible: true,
+      pendingPrivacyAction: '',
+      pendingSlotIndex: -1,
+    })
   },
 
   syncColorFromSpinResult() {
@@ -94,10 +112,80 @@ Page({
       uploadedImages: nextImages,
       slots: this.buildSlots(nextImages, templateId),
       composedImagePath: '',
+      swapSourceIndex: -1,
     })
   },
 
+  ensurePrivacyConsent(action: '' | 'choose' | 'pick' | 'save', slotIndex = -1): boolean {
+    const accepted = wx.getStorageSync('privacyConsentAccepted')
+    if (accepted) {
+      return true
+    }
+    this.setData({
+      privacyPopupVisible: true,
+      pendingPrivacyAction: action,
+      pendingSlotIndex: slotIndex,
+    })
+    return false
+  },
+
+  onOpenPrivacyContract() {
+    const wxAny = wx as WechatMiniprogram.Wx & {
+      openPrivacyContract?: (options?: {
+        success?: () => void
+        fail?: () => void
+      }) => void
+    }
+    if (wxAny.openPrivacyContract) {
+      wxAny.openPrivacyContract({
+        fail: () => {
+          wx.showToast({ title: '请在后台完善隐私指引', icon: 'none' })
+        },
+      })
+      return
+    }
+    wx.showToast({ title: '当前基础库不支持打开隐私指引', icon: 'none' })
+  },
+
+  onAgreePrivacy() {
+    const action = this.data.pendingPrivacyAction
+    const slotIndex = this.data.pendingSlotIndex
+    wx.setStorageSync('privacyConsentAccepted', true)
+    this.setData({
+      privacyPopupVisible: false,
+      pendingPrivacyAction: '',
+      pendingSlotIndex: -1,
+    })
+    if (action === 'choose') {
+      void this.doChooseImages()
+      return
+    }
+    if (action === 'pick') {
+      void this.doPickSlotImage(slotIndex)
+      return
+    }
+    if (action === 'save') {
+      void this.doSaveImage()
+    }
+  },
+
+  onDeclinePrivacy() {
+    this.setData({
+      privacyPopupVisible: false,
+      pendingPrivacyAction: '',
+      pendingSlotIndex: -1,
+    })
+    wx.showToast({ title: '需要同意隐私指引后才能继续', icon: 'none' })
+  },
+
   async onChooseImages() {
+    if (!this.ensurePrivacyConsent('choose')) {
+      return
+    }
+    await this.doChooseImages()
+  },
+
+  async doChooseImages() {
     const template = TEMPLATES.find((item) => item.id === this.data.selectedTemplateId)!
     const current = [...this.data.uploadedImages]
     const emptyIndexes: number[] = []
@@ -149,6 +237,52 @@ Page({
 
   async onPickSlotImage(e: WechatMiniprogram.CustomEvent) {
     const slotIndex = Number(e.currentTarget.dataset.index)
+    const currentPath = this.data.uploadedImages[slotIndex] || ''
+    const swapSourceIndex = this.data.swapSourceIndex
+
+    if (swapSourceIndex >= 0) {
+      if (!currentPath) {
+        wx.showToast({ title: '请选择另一张已有照片交换', icon: 'none' })
+        return
+      }
+      if (swapSourceIndex === slotIndex) {
+        this.setData({ swapSourceIndex: -1 })
+        return
+      }
+      this.swapSlots(swapSourceIndex, slotIndex)
+      return
+    }
+
+    if (!this.ensurePrivacyConsent('pick', slotIndex)) {
+      return
+    }
+    await this.doPickSlotImage(slotIndex)
+  },
+
+  onSlotLongPress(e: WechatMiniprogram.CustomEvent) {
+    const slotIndex = Number(e.currentTarget.dataset.index)
+    const currentPath = this.data.uploadedImages[slotIndex] || ''
+    if (!currentPath) {
+      return
+    }
+    this.setData({ swapSourceIndex: slotIndex })
+    wx.showToast({ title: '已选中照片，请点另一张交换位置', icon: 'none' })
+  },
+
+  swapSlots(fromIndex: number, toIndex: number) {
+    const nextImages = [...this.data.uploadedImages]
+    const temp = nextImages[fromIndex]
+    nextImages[fromIndex] = nextImages[toIndex]
+    nextImages[toIndex] = temp
+    this.setData({
+      uploadedImages: nextImages,
+      slots: this.buildSlots(nextImages, this.data.selectedTemplateId),
+      composedImagePath: '',
+      swapSourceIndex: -1,
+    })
+  },
+
+  async doPickSlotImage(slotIndex: number) {
     const template = TEMPLATES.find((item) => item.id === this.data.selectedTemplateId)!
     try {
       const res = await wx.chooseMedia({
@@ -230,10 +364,8 @@ Page({
     const canvasHeight = 1440
     const padding = Math.floor(52 * 0.8)
     const selected = PALETTE[this.data.selectedColorIndex]
-    const [r, g, b] = this.hexToRgb(selected.hex)
-    const bgColor = `rgba(${r}, ${g}, ${b}, 0.25)`
 
-    ctx.setFillStyle(bgColor)
+    ctx.setFillStyle(selected.hex)
     ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
     const titleY = Math.floor(120 * 0.8)
@@ -258,7 +390,7 @@ Page({
     ctx.fillText(selected.name, padding + 50, cardY + 34)
 
     ctx.setFillStyle('rgba(0, 0, 0, 0.5)')
-    ctx.setFontSize(30)
+    ctx.setFontSize(28)
     ctx.fillText(this.data.nowLabel, padding + cardW + 24, cardY + 32)
 
     const gridTop = cardY + cardH + 38
@@ -324,9 +456,49 @@ Page({
     })
   },
 
+  async requestAlbumPermission(): Promise<boolean> {
+    try {
+      const setting = await wx.getSetting()
+      const authSetting = setting.authSetting || {}
+      if (authSetting['scope.writePhotosAlbum']) {
+        return true
+      }
+      if (authSetting['scope.writePhotosAlbum'] === false) {
+        const openRes = await wx.openSetting()
+        return !!openRes.authSetting['scope.writePhotosAlbum']
+      }
+      await wx.authorize({ scope: 'scope.writePhotosAlbum' })
+      return true
+    } catch (error) {
+      try {
+        const openRes = await wx.openSetting()
+        return !!openRes.authSetting['scope.writePhotosAlbum']
+      } catch (openError) {
+        return false
+      }
+    }
+  },
+
   async onSaveImage() {
+    if (!this.ensurePrivacyConsent('save')) {
+      return
+    }
+    await this.doSaveImage()
+  },
+
+  async doSaveImage() {
     if (!this.data.composedImagePath) {
       wx.showToast({ title: '请先生成拼图', icon: 'none' })
+      return
+    }
+
+    const granted = await this.requestAlbumPermission()
+    if (!granted) {
+      wx.showModal({
+        title: '需要相册权限',
+        content: '请先允许保存到相册，才能保存拼图图片。',
+        showCancel: false,
+      })
       return
     }
 
