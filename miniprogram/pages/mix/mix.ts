@@ -88,11 +88,16 @@ Page({
     pickerV: 0.9,
     pickerHueHex: '#00bcd4',
     historyColors: [] as string[], // 记录最近拾取的颜色
+    textColor: '#FFFFFF', // 默认文字颜色
+    availableTextColors: ['#FFFFFF', '#000000'], // 候选文字色
+    showTextColorGuide: false, // 是否显示“上划切换颜色”引导
   },
 
   // geometry in canvas px (not rpx)
   _canvasW: 0,
   _canvasH: 0,
+  _canvasX: 0, // 画布相对于屏幕左边缘的距离
+  _canvasY: 0, // 画布相对于屏幕顶部的距离
   _card: { x: 0, y: 0, w: 0, h: 0, solidH: 0, photoH: 0 },
   _img: { w: 0, h: 0 },
   _fitScale: 1,
@@ -145,16 +150,29 @@ Page({
       return
     }
 
-    if (touches.length === 1) {
-      this._touchMode = 'pan'
-      this._touchStart = { x: touches[0].clientX, y: touches[0].clientY }
-      this._offsetStart = { ...this._offset }
-    } else if (touches.length >= 2) {
+    if (touches.length >= 2) {
+      // 启用双指捏合缩放
       this._touchMode = 'pinch'
       const dx = touches[1].clientX - touches[0].clientX
       const dy = touches[1].clientY - touches[0].clientY
       this._pinchDistStart = Math.sqrt(dx * dx + dy * dy)
       this._scaleStart = this._scale
+    } else {
+      // 单指逻辑：判定是纯色区滑动还是照片区（仅做点击，不记录位移模式以达到锁定位移效果）
+      const c = this._card
+      const x = touches[0].clientX - this._canvasX
+      const y = touches[0].clientY - this._canvasY
+      
+      if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.solidH) {
+        // 纯色区域手势
+        this._touchMode = 'solid-swipe'
+        this._touchStart = { x: touches[0].clientX, y: touches[0].clientY }
+      } else {
+        // 照片区域手势：设为 pan 模式但不执行位移逻辑（在 onTouchMove 中已禁掉位移），
+        // 这样可以记录位移量，从而在 onCanvasTap 中判定是否发生了滑动以决定是否换图
+        this._touchMode = 'pan'
+        this._touchStart = { x: touches[0].clientX, y: touches[0].clientY }
+      }
     }
   },
 
@@ -170,21 +188,8 @@ Page({
       return
     }
 
-    if (this._touchMode === 'pan' && touches.length === 1) {
-      const dx = touches[0].clientX - this._touchStart.x
-      const dy = touches[0].clientY - this._touchStart.y
-      
-      // 位移判定：超过 5px 视为拖拽，禁掉点击换图
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-        this._hasMoved = true
-      }
-
-      this._offset = {
-        x: this._offsetStart.x + dx,
-        y: this._offsetStart.y + dy
-      }
-      this.draw()
-    } else if (this._touchMode === 'pinch' && touches.length >= 2) {
+    // 缩放逻辑 (仅在两个手指时触发)
+    if (this._touchMode === 'pinch' && touches.length >= 2) {
       this._hasMoved = true
       const dx = touches[1].clientX - touches[0].clientX
       const dy = touches[1].clientY - touches[0].clientY
@@ -192,6 +197,67 @@ Page({
       const ratio = dist / (this._pinchDistStart || 1)
       this._scale = Math.max(0.3, Math.min(5, this._scaleStart * ratio))
       this.draw()
+      return
+    }
+
+    // 纯色区域切色逻辑
+    if (this._touchMode === 'solid-swipe' && touches.length === 1) {
+      const dx = touches[0].clientX - this._touchStart.x
+      // 当滑动位移超过 40 像素时，切换一次颜色
+      const threshold = 40
+      if (Math.abs(dx) > threshold) {
+        this._hasMoved = true
+        this.cyclePaletteColor(dx > 0 ? 1 : -1)
+        // 重置起始点，实现连续滑动切换
+        this._touchStart.x = touches[0].clientX
+      }
+      
+      const dy = touches[0].clientY - this._touchStart.y
+      if (Math.abs(dy) > threshold) {
+        this._hasMoved = true
+        this.cycleTextColor(dy < 0 ? 1 : -1)
+        this._touchStart.y = touches[0].clientY
+      }
+    }
+  },
+
+  // 循环切换文字颜色
+  cycleTextColor(dir: number) {
+    const list = this.data.availableTextColors || ['#FFFFFF', '#000000']
+    let idx = list.indexOf(this.data.textColor)
+    if (idx === -1) idx = 0
+    let nextIdx = (idx + dir + list.length) % list.length
+    this.setData({ textColor: list[nextIdx] })
+    this.draw()
+  },
+
+  // 更新候选文字颜色列表
+  updateAvailableTextColors() {
+    const { solidColor, mainColors } = this.data
+    let colors = ['#FFFFFF', '#000000']
+    
+    // 寻找两个与当前背景色不同的提取色
+    const extra = mainColors
+      .filter(c => c.toLowerCase() !== solidColor.toLowerCase())
+      .slice(0, 2)
+    
+    this.setData({
+      availableTextColors: ['#FFFFFF', '#000000', ...extra]
+    })
+  },
+
+  // 循环切换调色盘颜色
+  cyclePaletteColor(dir: number) {
+    const list = this.data.recommendedColors || []
+    if (!list.length) return
+    
+    let idx = list.indexOf(this.data.solidColor)
+    if (idx === -1) idx = 0
+    
+    let nextIdx = (idx + dir + list.length) % list.length
+    const nextColor = list[nextIdx]
+    if (nextColor) {
+      this.updateGlobalColor(nextColor)
     }
   },
 
@@ -214,6 +280,8 @@ Page({
       if (!rect) return
       this._canvasW = Math.floor(rect.width)
       this._canvasH = Math.floor(rect.height)
+      this._canvasX = rect.left
+      this._canvasY = rect.top
 
       const cardW = Math.floor(this._canvasW * 0.78)
       const cardH = Math.floor((cardW * 4) / 3)
@@ -242,6 +310,7 @@ Page({
 	          this._offset = { x: 0, y: 0 }
 	          this.setData({ photoPath: path })
 	          await this.extractMainColors(path)
+            this.updateAvailableTextColors() // 更新文字候选色
 	          this.draw()
           resolve()
         },
@@ -366,6 +435,8 @@ Page({
             mainColors: top,
             bgColor: base,
             solidColor: base,
+          }, () => {
+            this.updateAvailableTextColors()
           })
           this.draw()
         },
@@ -927,12 +998,25 @@ Page({
                 return
               }
               
-              this.setData({ locationText: newText })
+              this.setData({ 
+                locationText: newText,
+                showTextColorGuide: true // 显示引导
+              })
               this.draw()
+              // 5秒后自动隐藏引导
+              setTimeout(() => {
+                this.setData({ showTextColorGuide: false })
+              }, 5000)
             } catch (e) {
               // 网络异常等情况，为不影响用户体验，可根据策略放行或阻断
-              this.setData({ locationText: newText })
+              this.setData({ 
+                locationText: newText,
+                showTextColorGuide: true
+              })
               this.draw()
+              setTimeout(() => {
+                this.setData({ showTextColorGuide: false })
+              }, 5000)
             } finally {
               wx.hideLoading()
             }
@@ -1014,7 +1098,7 @@ Page({
       ctx.setFillStyle('rgba(0,0,0,0.3)')
       ctx.fillText('点击编辑文本', c.x + c.w / 2, midY + 6)
     } else {
-      ctx.setFillStyle('rgba(0,0,0,0.78)')
+      ctx.setFillStyle(this.data.textColor) // 使用动态文字颜色
       const lines = mainText.split('\n')
       const fontSize = 14
       const lineHeight = fontSize * 1.5
@@ -1160,7 +1244,7 @@ Page({
       // 绘制文字 (支持多行导出)
       const midY = cardY + solidH / 2
       ctx.setTextAlign('center')
-      ctx.setFillStyle('rgba(0,0,0,0.78)')
+      ctx.setFillStyle(this.data.textColor) // 导出也使用动态文字颜色
       
       const mainText = this.data.locationText
       if (mainText) {

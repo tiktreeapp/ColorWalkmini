@@ -495,3 +495,41 @@ page {
   gap: 16px;
 }
 
+.text-color-guide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(35% - 60px); /* 向上移动 60 像素 */
+  display: flex;
+  justify-content: center;
+  z-index: 100;
+  pointer-events: none;
+  animation: guideFadeIn 0.4s ease-out both;
+}
+
+.guide-box {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 8px 16px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(4px);
+}
+
+.guide-icon {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.guide-text {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+@keyframes guideFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

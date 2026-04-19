@@ -7,6 +7,14 @@
     bindtouchend="onTouchEnd"
     bindtap="onCanvasTap"
   ></canvas>
+  
+  <!-- 文本颜色手势引导 -->
+  <cover-view class="text-color-guide" wx:if="{{showTextColorGuide}}">
+    <cover-view class="guide-box">
+      <cover-view class="guide-icon">↑</cover-view>
+      <cover-view class="guide-text">滑动文本切换颜色</cover-view>
+    </cover-view>
+  </cover-view>
 
   <view class="bottom-bar">
     <view class="bar-left">
