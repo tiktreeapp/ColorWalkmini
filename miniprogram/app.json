@@ -1,7 +1,7 @@
 {
   "pages": [
-    "pages/mix/mix",
     "pages/spin/spin",
+    "pages/mix/mix",
     "pages/collage/collage",
     "pages/collage-result/collage-result",
     "pages/logs/logs"

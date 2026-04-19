@@ -537,10 +537,20 @@ Page({
 
   async pickUserPhoto() {
     try {
+      // 显式触发隐私授权检查，符合微信合规要求
+      if (wx.requirePrivacyAuthorize) {
+        await new Promise((resolve, reject) => {
+          wx.requirePrivacyAuthorize({
+            success: resolve,
+            fail: reject
+          })
+        })
+      }
+
       const res = await new Promise<any>((resolve, reject) => {
         wx.chooseImage({
           count: 1,
-          sizeType: ['original'],
+          sizeType: ['original', 'compressed'], // 允许用户自行选择是否使用原图
           sourceType: ['album'], // 直接调起相册，不再弹出拍照选项
           success: resolve,
           fail: reject
