@@ -1,8 +1,13 @@
 <view class="page">
   <image wx:if="{{imagePath}}" src="{{imagePath}}" mode="widthFix" class="result-image"></image>
   <view wx:else class="empty">暂无拼图结果</view>
+  <view class="meta-row" wx:if="{{city}}">
+    <view class="meta-right">
+      <text class="meta-pin">📍</text>
+      <text class="meta-city">{{city}}</text>
+    </view>
+  </view>
   <button class="save-btn" bindtap="onSaveImage">保存到相册</button>
-  <button class="share-btn" open-type="share">分享拼图给朋友</button>
 
   <view class="privacy-mask" wx:if="{{privacyPopupVisible}}">
     <view class="privacy-card">

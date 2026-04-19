@@ -47,6 +47,19 @@ page {
   padding: 0 16rpx;
 }
 
+.mood-control {
+  display: flex;
+  align-items: center;
+  padding: 0 16rpx;
+}
+
+.mood-display {
+  flex: 1;
+  font-size: 30rpx;
+  letter-spacing: 0rpx;
+  white-space: nowrap;
+}
+
 .chip {
   width: 34rpx;
   height: 34rpx;
@@ -74,6 +87,14 @@ page {
 .mood-input {
   padding: 0 20rpx;
   font-size: 30rpx;
+}
+
+.mood-static {
+  display: flex;
+  align-items: center;
+  padding: 0 20rpx;
+  font-size: 30rpx;
+  color: #222;
 }
 
 .field {
@@ -216,8 +237,8 @@ page {
   position: fixed;
   left: 24rpx;
   right: 24rpx;
-  bottom: calc(55rpx + constant(safe-area-inset-bottom));
-  bottom: calc(55rpx + env(safe-area-inset-bottom));
+  bottom: calc(55rpx - 12px + constant(safe-area-inset-bottom));
+  bottom: calc(55rpx - 12px + env(safe-area-inset-bottom));
   display: flex;
   gap: 12rpx;
   align-items: center;
@@ -241,6 +262,14 @@ page {
   top: -9999rpx;
   width: 1080rpx;
   height: 1440rpx;
+}
+
+.resize-canvas {
+  position: fixed;
+  left: -9999rpx;
+  top: -9999rpx;
+  width: 1080px;
+  height: 1080px;
 }
 
 .privacy-mask {

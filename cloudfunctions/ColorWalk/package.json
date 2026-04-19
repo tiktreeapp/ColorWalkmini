@@ -1,0 +1,9 @@
+{
+  "name": "content-security",
+  "version": "1.0.0",
+  "description": "WeChat content security cloud function",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

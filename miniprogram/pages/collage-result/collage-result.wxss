@@ -30,12 +30,47 @@ page {
   border-radius: 14rpx;
 }
 
-.share-btn {
-  margin-top: 16rpx;
+.meta-row {
+  margin-top: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 16rpx;
   background: #fff;
+}
+
+.meta-left {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.meta-label {
+  color: #666;
+  font-size: 26rpx;
+}
+
+.meta-value {
+  font-size: 30rpx;
   color: #111;
-  border-radius: 14rpx;
-  border: 1rpx solid #dcdcdc;
+  letter-spacing: 2rpx;
+}
+
+.meta-right {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.meta-pin {
+  font-size: 22rpx;
+}
+
+.meta-city {
+  font-size: 22rpx;
+  color: #111;
 }
 
 .privacy-mask {

@@ -2,17 +2,22 @@ Page({
   data: {
     imagePath: '',
     templateId: 9,
+    city: '',
     privacyPopupVisible: false,
   },
 
   onLoad() {
     const path = wx.getStorageSync('latestComposedImagePath')
     const templateId = wx.getStorageSync('latestTemplateId')
+    const city = wx.getStorageSync('latestCity')
     if (typeof templateId === 'number') {
       this.setData({ templateId })
     }
     if (typeof path === 'string' && path) {
       this.setData({ imagePath: path })
+    }
+    if (typeof city === 'string' && city) {
+      this.setData({ city })
     }
   },
 
@@ -103,12 +108,4 @@ Page({
     }
   },
 
-  onShareAppMessage() {
-    const imagePath = this.data.imagePath
-    return {
-      title: '分享我的 ColorWalk 拼图',
-      path: '/pages/collage/collage',
-      imageUrl: imagePath,
-    }
-  },
 })

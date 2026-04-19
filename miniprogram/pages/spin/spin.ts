@@ -46,14 +46,35 @@ Page({
 
   onLoad() {
     const miniProgramTipClosed = wx.getStorageSync('miniProgramTipClosed')
+    try {
+      wx.setInnerAudioOption({ obeyMuteSwitch: false, mixWithOther: true })
+    } catch (e) {
+      // ignore
+    }
     spinAudio = wx.createInnerAudioContext()
     spinAudio.src = SPIN_SOUND_SRC
     spinAudio.loop = true
     spinAudio.obeyMuteSwitch = false
+    spinAudio.onCanplay(() => {
+      if (spinAudio && this.data.spinning) {
+        try {
+          spinAudio.play()
+        } catch (e) {
+          // ignore
+        }
+      }
+    })
     spinAudio.onError(() => {
       if (spinAudio && !audioFallbackTried) {
         audioFallbackTried = true
         spinAudio.src = SPIN_SOUND_FALLBACK_SRC
+        if (this.data.spinning) {
+          try {
+            spinAudio.play()
+          } catch (e) {
+            // ignore
+          }
+        }
         return
       }
       wx.showToast({ title: '音效文件缺失，请检查 assets/audio', icon: 'none' })

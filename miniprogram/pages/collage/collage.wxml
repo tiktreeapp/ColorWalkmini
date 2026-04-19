@@ -13,12 +13,17 @@
       </view>
 
       <view class="inline-field">
-        <text class="inline-label">当下心情</text>
-        <input class="inline-control mood-input" value="{{moodText}}" bindinput="onMoodInput" maxlength="32" />
+        <text class="inline-label">心情</text>
+        <view class="inline-control mood-control">
+          <text class="mood-display">{{moodGroups[selectedMoodGroupIndex].display}}</text>
+          <picker mode="selector" range="{{moodGroups}}" range-key="display" value="{{selectedMoodGroupIndex}}" bindchange="onPickMoodGroup">
+            <view class="picker-trigger">▼</view>
+          </picker>
+        </view>
       </view>
 
       <view class="inline-field template-field">
-        <text class="inline-label">模版选择</text>
+        <text class="inline-label">模版</text>
         <view class="template-row compact">
           <block wx:for="{{templates}}" wx:key="id">
             <view class="template-item {{selectedTemplateId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="onTemplateSelect">{{item.label}}</view>
@@ -41,12 +46,12 @@
     </view>
 
     <canvas canvas-id="composeCanvas" class="compose-canvas"></canvas>
+    <canvas canvas-id="resizeCanvas" class="resize-canvas"></canvas>
   </scroll-view>
 
   <view class="action-bar">
-    <button class="action-btn" bindtap="onChooseImages">多图上传</button>
-    <button class="action-btn" bindtap="onComposeImage">生成拼图</button>
-    <button class="action-btn" bindtap="onSaveImage">保存相册</button>
+    <button class="action-btn" bindtap="onChooseImages" disabled="{{uploading}}">{{uploading ? '上传中...' : '多图上传'}}</button>
+    <button class="action-btn" bindtap="onComposeImage" disabled="{{uploading}}">生成拼图</button>
   </view>
 
   <view class="privacy-mask" wx:if="{{privacyPopupVisible}}">

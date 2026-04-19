@@ -115,12 +115,4 @@ Page({
     })
   },
 
-  onShareAppMessage() {
-    const imagePath = this.data.imagePath
-    return {
-      title: '分享我的 ColorWalk 拼图',
-      path: '/pages/collage/collage',
-      imageUrl: imagePath,
-    }
-  },
 })

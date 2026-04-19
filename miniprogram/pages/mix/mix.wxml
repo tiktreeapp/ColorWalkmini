@@ -1,0 +1,87 @@
+<view class="page" style="background: {{bgColor}};">
+  <canvas
+    canvas-id="mixCanvas"
+    class="mix-canvas"
+    bindtouchstart="onTouchStart"
+    bindtouchmove="onTouchMove"
+    bindtouchend="onTouchEnd"
+    bindtap="onCanvasTap"
+  ></canvas>
+
+  <view class="bottom-bar">
+    <view class="bar-left">
+      <view class="btn palette-btn" bindtap="onTogglePalette" aria-label="色盘"></view>
+
+      <block wx:for="{{mainColors}}" wx:key="*this">
+        <view class="btn swatch main-swatch" style="background: {{item}};" data-color="{{item}}" bindtap="onPickColor"></view>
+      </block>
+    </view>
+
+    <view class="bar-right">
+      <view class="btn download-btn" bindtap="onDownload">保存</view>
+    </view>
+  </view>
+
+  <!-- Use cover-view to guarantee the panel is above native canvas layer -->
+  <cover-view class="palette-mask" wx:if="{{paletteVisible}}" bindtap="onTogglePalette">
+    <cover-view class="palette-sheet" bindtap="noop">
+      <cover-view class="sheet-head">
+        <cover-view class="sheet-title">色盘</cover-view>
+        <cover-view class="sheet-tools">
+          <cover-view class="tool-pill {{colorTarget === 'solid' ? 'active' : ''}}" data-target="solid" bindtap="onPickTarget">拼色</cover-view>
+          <cover-view class="tool-pill {{colorTarget === 'bg' ? 'active' : ''}}" data-target="bg" bindtap="onPickTarget">背景</cover-view>
+          <cover-view class="tool-pill {{eyedropper ? 'active' : ''}}" bindtap="onToggleEyedropper">吸管</cover-view>
+        </cover-view>
+      </cover-view>
+
+      <cover-view class="picker-wrap">
+        <cover-view
+          class="picker-sv"
+          data-kind="sv"
+          bindtouchstart="onPickerTouch"
+          bindtouchmove="onPickerTouch"
+          style="background: {{pickerHueHex}};"
+        >
+          <cover-view class="sv-white"></cover-view>
+          <cover-view class="sv-black"></cover-view>
+          <cover-view
+            class="sv-thumb"
+            style="left: {{pickerS * 100}}%; top: {{(1 - pickerV) * 100}}%;"
+          ></cover-view>
+        </cover-view>
+
+        <cover-view
+          class="picker-hue"
+          data-kind="hue"
+          bindtouchstart="onPickerTouch"
+          bindtouchmove="onPickerTouch"
+        >
+          <cover-view class="hue-thumb" style="left: {{(pickerHue / 360) * 100}}%;"></cover-view>
+        </cover-view>
+      </cover-view>
+
+      <cover-view class="sheet-grid">
+        <block wx:for="{{commonColors}}" wx:key="*this">
+          <cover-view class="grid-color" style="background: {{item}};" data-color="{{item}}" bindtap="onPickColor"></cover-view>
+        </block>
+      </cover-view>
+      <cover-view class="sheet-tip">先选择拼色/背景，再选颜色或用吸管取色</cover-view>
+    </cover-view>
+  </cover-view>
+
+  <canvas canvas-id="analyzeCanvas" class="hidden-canvas"></canvas>
+  <canvas
+    canvas-id="cropCanvas"
+    class="hidden-canvas"
+    style="width: 1080px; height: 810px;"
+    width="1080"
+    height="810"
+  ></canvas>
+  <canvas
+    canvas-id="exportCanvas"
+    class="hidden-canvas"
+    style="width: 1920px; height: 2560px;"
+    width="1920"
+    height="2560"
+  ></canvas>
+</view>
