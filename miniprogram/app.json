@@ -20,8 +20,8 @@
       {
         "pagePath": "pages/mix/mix",
         "text": "照片拼色",
-        "iconPath": "assets/tab/mix.png",
-        "selectedIconPath": "assets/tab/mix-active.png"
+        "iconPath": "assets/tab/pinjie.png",
+        "selectedIconPath": "assets/tab/pinjie-active.png"
       },
       {
         "pagePath": "pages/spin/spin",
@@ -32,8 +32,8 @@
       {
         "pagePath": "pages/collage/collage",
         "text": "照片拼图",
-        "iconPath": "assets/tab/pinjie.png",
-        "selectedIconPath": "assets/tab/pinjie-active.png"
+        "iconPath": "assets/tab/mix.png",
+        "selectedIconPath": "assets/tab/mix-active.png"
       }
     ]
   },

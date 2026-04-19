@@ -10,10 +10,17 @@
 
   <view class="bottom-bar">
     <view class="bar-left">
-      <view class="btn palette-btn" bindtap="onTogglePalette" aria-label="色盘"></view>
+      <view class="btn palette-btn {{paletteVisible ? 'active' : ''}}" bindtap="onTogglePalette" aria-label="色盘">
+        <view class="palette-inner" style="background: {{solidColor}}; border-color: rgba(255,255,255,1);"></view>
+      </view>
 
       <block wx:for="{{mainColors}}" wx:key="*this">
-        <view class="btn swatch main-swatch" style="background: {{item}};" data-color="{{item}}" bindtap="onPickColor"></view>
+        <view 
+          class="btn swatch main-swatch {{item === solidColor ? 'active' : ''}}" 
+          style="background: {{item}};" 
+          data-color="{{item}}" 
+          bindtap="onPickColor"
+        ></view>
       </block>
     </view>
 
@@ -22,54 +29,56 @@
     </view>
   </view>
 
-  <!-- Use cover-view to guarantee the panel is above native canvas layer -->
+  <cover-view class="float-picker" wx:if="{{eyedropper}}" style="left: {{eyedropperPos.x}}px; top: {{eyedropperPos.y}}px;">
+    <cover-view class="picker-tip">点击或拖拽选取颜色</cover-view>
+    <cover-view class="picker-inner" style="border-color: {{solidColor}};">
+      <cover-view class="picker-dot" style="background: {{solidColor}};"></cover-view>
+    </cover-view>
+    <cover-view class="picker-close" bindtap="onToggleEyedropper">退出拾色</cover-view>
+  </cover-view>
+
+  <!-- 调色盘：必须使用 cover-view 才能盖在 canvas 之上 -->
   <cover-view class="palette-mask" wx:if="{{paletteVisible}}" bindtap="onTogglePalette">
-    <cover-view class="palette-sheet" bindtap="noop">
+    <cover-view class="palette-sheet" catchtap="noop">
       <cover-view class="sheet-head">
-        <cover-view class="sheet-title">色盘</cover-view>
+        <cover-view class="sheet-title">调色盘</cover-view>
         <cover-view class="sheet-tools">
-          <cover-view class="tool-pill {{colorTarget === 'solid' ? 'active' : ''}}" data-target="solid" bindtap="onPickTarget">拼色</cover-view>
-          <cover-view class="tool-pill {{colorTarget === 'bg' ? 'active' : ''}}" data-target="bg" bindtap="onPickTarget">背景</cover-view>
-          <cover-view class="tool-pill {{eyedropper ? 'active' : ''}}" bindtap="onToggleEyedropper">吸管</cover-view>
+          <cover-view class="tool-icon-btn" bindtap="onToggleEyedropper">
+             <cover-image class="eyedropper-icon-img" src="{{eyedropper ? '/assets/tab/xiguan-active.png' : '/assets/tab/xiguan.png'}}" />
+          </cover-view>
         </cover-view>
       </cover-view>
 
-      <cover-view class="picker-wrap">
-        <cover-view
-          class="picker-sv"
-          data-kind="sv"
-          bindtouchstart="onPickerTouch"
-          bindtouchmove="onPickerTouch"
-          style="background: {{pickerHueHex}};"
-        >
-          <cover-view class="sv-white"></cover-view>
-          <cover-view class="sv-black"></cover-view>
-          <cover-view
-            class="sv-thumb"
-            style="left: {{pickerS * 100}}%; top: {{(1 - pickerV) * 100}}%;"
-          ></cover-view>
-        </cover-view>
-
-        <cover-view
-          class="picker-hue"
-          data-kind="hue"
-          bindtouchstart="onPickerTouch"
-          bindtouchmove="onPickerTouch"
-        >
-          <cover-view class="hue-thumb" style="left: {{(pickerHue / 360) * 100}}%;"></cover-view>
+      <!-- 已存颜色：长方形色块，带色值显示 -->
+      <cover-view class="history-wrap" wx:if="{{historyColors.length > 0}}">
+        <cover-view class="history-title">已存颜色</cover-view>
+        <cover-view class="history-grid">
+          <cover-view 
+            class="history-item" 
+            wx:for="{{historyColors}}" 
+            wx:key="*this"
+            style="background: {{item}};"
+            data-color="{{item}}"
+            bindtap="onPickColor"
+          >
+            <cover-view class="history-hex">{{item}}</cover-view>
+          </cover-view>
         </cover-view>
       </cover-view>
 
-      <cover-view class="sheet-grid">
-        <block wx:for="{{commonColors}}" wx:key="*this">
-          <cover-view class="grid-color" style="background: {{item}};" data-color="{{item}}" bindtap="onPickColor"></cover-view>
-        </block>
+      <!-- 推荐颜色：圆形色块 -->
+      <cover-view class="history-wrap">
+        <cover-view class="history-title">推荐颜色</cover-view>
+        <cover-view class="sheet-grid">
+          <block wx:for="{{commonColors}}" wx:key="*this">
+            <cover-view class="grid-color" style="background: {{item}};" data-color="{{item}}" bindtap="onPickColor"></cover-view>
+          </block>
+        </cover-view>
       </cover-view>
-      <cover-view class="sheet-tip">先选择拼色/背景，再选颜色或用吸管取色</cover-view>
     </cover-view>
   </cover-view>
 
-  <canvas canvas-id="analyzeCanvas" class="hidden-canvas"></canvas>
+  <canvas canvas-id="analyzeCanvas" class="hidden-canvas" style="width: 96px; height: 72px;"></canvas>
   <canvas
     canvas-id="cropCanvas"
     class="hidden-canvas"
@@ -80,8 +89,8 @@
   <canvas
     canvas-id="exportCanvas"
     class="hidden-canvas"
-    style="width: 1920px; height: 2560px;"
-    width="1920"
-    height="2560"
+    style="width: 1080px; height: 1440px;"
+    width="1080"
+    height="1440"
   ></canvas>
 </view>

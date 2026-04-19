@@ -63,25 +63,32 @@ function colorDistance(a: string, b: string) {
 const DEFAULT_PHOTO = '/assets/photos/sample.jpg'
 
 Page({
-	  data: {
-	    photoPath: DEFAULT_PHOTO,
-	    bgColor: '#2f7dae',
-	    solidColor: '#2f7dae',
-	    colorTarget: 'solid' as 'solid' | 'bg',
-	    mainColors: [] as string[],
+  data: {
+    photoPath: DEFAULT_PHOTO,
+    bgColor: '#2f7dae',
+    solidColor: '#2f7dae',
+    mainColors: [] as string[],
+    spectrumHues: [
+      '#FF0000', '#FF4000', '#FF8000', '#FFC000', '#FFFF00', '#C0FF00', 
+      '#80FF00', '#40FF00', '#00FF00', '#00FF80', '#00FFFF', '#0080FF', 
+      '#0000FF', '#4000FF', '#8000FF', '#C000FF', '#FF00FF', '#FF0080'
+    ],
     commonColors: [
       '#111111', '#ffffff', '#f44336', '#ff9800', '#ffeb3b', '#4caf50', '#2196f3', '#9c27b0',
-      '#00bcd4', '#009688', '#795548', '#607d8b', '#ff5f6d', '#ffc371', '#8be28b', '#72a8ff',
+      '#FF6B6B', '#4ECDC4', '#45B3D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#82E0AA',
+      '#EB9486', '#7E7F9A', '#F3DE8A', '#CAE9FF', '#1B4965', '#62B6CB', '#BEE9E8', '#5FA8D3',
     ],
-	    paletteVisible: false,
-	    eyedropper: false,
-	    locationText: '',
-	    timeText: '',
-	    pickerHue: 200,
-	    pickerS: 0.6,
-	    pickerV: 0.9,
-	    pickerHueHex: '#00bcd4',
-	  },
+    paletteVisible: false,
+    eyedropper: false,
+    eyedropperPos: { x: 0, y: 0 }, // 悬浮吸管位置
+    locationText: '',
+    timeText: '',
+    pickerHue: 200,
+    pickerS: 0.6,
+    pickerV: 0.9,
+    pickerHueHex: '#00bcd4',
+    historyColors: [] as string[], // 记录最近拾取的颜色
+  },
 
   // geometry in canvas px (not rpx)
   _canvasW: 0,
@@ -98,6 +105,7 @@ Page({
   _scaleStart: 1,
   _touchId0: 0,
   _touchId1: 0,
+  _confirmTimer: null as any,
 
 	  onLoad() {
 	    const now = new Date()
@@ -106,8 +114,9 @@ Page({
     const hh = `${now.getHours()}`.padStart(2, '0')
     const min = `${now.getMinutes()}`.padStart(2, '0')
 	    this.setData({
-	      timeText: `${now.getFullYear()}.${mm}.${dd} ${hh}:${min}`,
+	      timeText: '', // 初始为空，由照片提取
 	      locationText: (wx.getStorageSync('latestLocationText') as string) || '',
+        historyColors: (wx.getStorageSync('historyColors') as string[]) || [], // 加载本地缓存
 	    })
 	    this.syncPickerHueHex()
 	  },
@@ -194,42 +203,90 @@ Page({
             const { s, v } = rgbToHsv(r, g, b)
             const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
             const prev = buckets.get(key)
-            // Prioritize area (count) first; use saturation/value as a light tie-breaker.
-            const score = 1 + s * 0.35 + v * 0.1
             if (!prev) {
-              buckets.set(key, { count: 1, score, r, g, b })
+              buckets.set(key, { count: 1, score: 0, r, g, b })
             } else {
               prev.count += 1
-              prev.score += score
             }
           }
-          const ranked = [...buckets.values()]
-            .map((it) => ({
-              hex: rgbToHex(it.r, it.g, it.b),
-              weight: it.count * (it.score / it.count),
-            }))
+
+          const candidates = [...buckets.values()]
+            .map((it) => {
+              const { r, g, b } = it
+              // 计算更精确的 HSV
+              const max = Math.max(r, g, b)
+              const min = Math.min(r, g, b)
+              const d = max - min
+              const v = max / 255
+              const s = max === 0 ? 0 : d / max
+              let h = 0
+              if (d !== 0) {
+                if (max === r) h = (g - b) / d + (g < b ? 6 : 0)
+                else if (max === g) h = (b - r) / d + 2
+                else h = (r - g) / d + 4
+                h *= 60
+              }
+
+              // 1. 基础权重：面积（count）
+              let weight = it.count
+
+              // 2. 鲜艳度加成：饱和度越高，在这个基础上加分
+              weight *= (1 + s * 4.0)
+
+              // 3. 用户指定的色相加成（红、绿、黄、蓝色系）
+              let bias = 1.0
+              if (s > 0.15 && v > 0.1) { // 只有非黑白灰色才加成
+                if (h < 20 || h > 340) bias = 3.0 // 红色
+                else if (h > 40 && h < 80) bias = 2.5 // 黄色
+                else if (h > 80 && h < 165) bias = 2.0 // 绿色
+                else if (h > 185 && h < 265) bias = 2.0 // 蓝色
+              }
+              weight *= bias
+
+              // 4. 极端亮度惩罚
+              if (v < 0.15 || v > 0.95) weight *= 0.2
+
+              return {
+                hex: rgbToHex(r, g, b),
+                r, g, b, h, s, v,
+                weight
+              }
+            })
             .sort((a, b) => b.weight - a.weight)
-          const candidates = ranked
-            .map((it) => it.hex)
-            .filter((v, idx, arr) => arr.indexOf(v) === idx)
 
           const top: string[] = []
-          for (let i = 0; i < candidates.length && top.length < 3; i += 1) {
-            const c = candidates[i]
-            if (!top.length) {
-              top.push(c)
-              continue
-            }
-            const tooClose = top.some((picked) => colorDistance(picked, c) < 46)
-            if (!tooClose) {
-              top.push(c)
+          
+          // 采用“阶梯式筛选”，优先保证巨大的视觉差异
+          const steps = [110, 80, 50] // 三档距离阈值
+          
+          for (const threshold of steps) {
+            for (let i = 0; i < candidates.length && top.length < 3; i += 1) {
+              const c = candidates[i]
+              const alreadyIn = top.includes(c.hex)
+              if (alreadyIn) continue
+
+              const tooClose = top.some((picked) => {
+                const [pr, pg, pb] = hexToRgb(picked)
+                const dr = pr - c.r
+                const dg = pg - c.g
+                const db = pb - c.b
+                const dist = Math.sqrt(dr * dr + dg * dg + db * db)
+                return dist < threshold
+              })
+
+              if (!tooClose) {
+                top.push(c.hex)
+              }
             }
           }
-          for (let i = 0; i < candidates.length && top.length < 3; i += 1) {
-            if (!top.includes(candidates[i])) {
-              top.push(candidates[i])
+
+          // 如果还是不够，按权重硬补（保底逻辑，通常不会走到这）
+          if (top.length < 3) {
+            for (let i = 0; i < candidates.length && top.length < 3; i += 1) {
+              if (!top.includes(candidates[i].hex)) top.push(candidates[i].hex)
             }
           }
+
           const base = top[0] || '#2f7dae'
           this.setData({
             mainColors: top,
@@ -250,23 +307,76 @@ Page({
 	  },
 
   onToggleEyedropper() {
-    this.setData({ eyedropper: !this.data.eyedropper })
+    const newValue = !this.data.eyedropper
+    const c = this._card
+    
+    let pos = { x: this._canvasW / 2, y: this._canvasH / 2 }
+    if (newValue) {
+      // 初始位置设定在图片区域的靠上 1/3 处，避开纯色区文字
+      pos = {
+        x: c.x + c.w / 2,
+        y: (c.y + c.solidH) + (c.photoH / 3)
+      }
+      
+      this.setData({
+        eyedropper: newValue,
+        eyedropperPos: pos,
+        paletteVisible: false // 开启吸管时关闭调色盘面板
+      })
+      
+      this.pickColorAt(pos.x, pos.y)
+      this.resetConfirmTimer()
+      
+      wx.showToast({
+        title: '点击取新颜色，非拖动',
+        icon: 'none',
+        duration: 3000
+      })
+    } else {
+      this.setData({ eyedropper: false })
+      this.clearConfirmTimer()
+    }
   },
 
-  onPickTarget(e: WechatMiniprogram.CustomEvent) {
-    const target = (e.currentTarget.dataset.target || 'solid') as 'solid' | 'bg'
-    this.setData({ colorTarget: target })
+  resetConfirmTimer() {
+    this.clearConfirmTimer()
+    this._confirmTimer = setTimeout(() => {
+      this.setData({ eyedropper: false })
+    }, 10000)
+  },
+
+  clearConfirmTimer() {
+    if (this._confirmTimer) {
+      clearTimeout(this._confirmTimer)
+      this._confirmTimer = null
+    }
   },
 
   onPickColor(e: WechatMiniprogram.CustomEvent) {
     const color = (e.currentTarget.dataset.color || '') as string
     if (!color) return
-    if (this.data.colorTarget === 'bg') {
-      this.setData({ bgColor: color })
-    } else {
-      this.setData({ solidColor: color })
-    }
+    this.setData({ eyedropper: false }) // 选色时关闭吸管防止冲突
+    this.clearConfirmTimer()
+    this.updateGlobalColor(color)
+  },
+
+  updateGlobalColor(color: string) {
+    this.setData({ 
+      solidColor: color,
+      bgColor: color
+    })
     this.draw()
+  },
+
+  // 将颜色加入最近历史
+  saveToHistory(color: string) {
+    let history = this.data.historyColors || []
+    if (!color) return
+    // 限制最近 12 个颜色
+    history = [color, ...history.filter(c => c !== color)].slice(0, 12)
+    this.setData({ historyColors: history })
+    // 同步到本地缓存
+    wx.setStorageSync('historyColors', history)
   },
 
 	  onPickerTouch(e: WechatMiniprogram.TouchEvent) {
@@ -285,20 +395,40 @@ Page({
       const lx = clamp((x - rect.left) / rect.width, 0, 1)
       const ly = clamp((y - rect.top) / rect.height, 0, 1)
 
-	      if (kind === 'hue') {
-	        const hue = Math.round(lx * 360)
-	        this.setData({ pickerHue: hue })
-	        this.syncPickerHueHex()
-	        this.applyPickerColor()
-	        return
-	      }
+      if (kind === 's') {
+        this.setData({ pickerS: lx })
+        this.applyPickerColor()
+        return
+      }
 
-      const s = lx
-      const v = 1 - ly
-	      this.setData({ pickerS: s, pickerV: v })
-	      this.applyPickerColor()
-	    })
-	  },
+      this.setData({ pickerHue: Math.round(lx * 360) })
+      this.syncPickerHueHex()
+      this.applyPickerColor()
+    })
+  },
+
+  onSpectrumTouch(e: WechatMiniprogram.TouchEvent) {
+    const t = (e.touches && e.touches[0]) || null
+    if (!t) return
+    const x = t.x
+    const y = t.y
+
+    const query = wx.createSelectorQuery().in(this)
+    query.select('.picker-spectrum').boundingClientRect()
+    query.exec((res) => {
+      const rect = res && res[0]
+      if (!rect) return
+      const lx = clamp((x - rect.left) / rect.width, 0, 1)
+      const ly = clamp((y - rect.top) / rect.height, 0, 1)
+
+      this.setData({
+        pickerHue: Math.floor(lx * 359),
+        pickerV: Math.max(0.01, 1 - ly)
+      })
+      this.syncPickerHueHex()
+      this.applyPickerColor()
+    })
+  },
 
 	  syncPickerHueHex() {
 	    const hueRgb = hsvToRgb(this.data.pickerHue, 1, 1)
@@ -307,60 +437,51 @@ Page({
 	  },
 
 	  applyPickerColor() {
-	    const { r, g, b } = hsvToRgb(this.data.pickerHue, this.data.pickerS, this.data.pickerV)
-	    const hex = rgbToHex(r, g, b)
-    if (this.data.colorTarget === 'bg') {
-      this.setData({ bgColor: hex })
-    } else {
-      this.setData({ solidColor: hex })
-    }
-	    this.draw()
-	  },
+    const { r, g, b } = hsvToRgb(this.data.pickerHue, this.data.pickerS, this.data.pickerV)
+    const hex = rgbToHex(r, g, b)
+    this.setData({ eyedropper: false }) // 滑动色盘时关闭吸管
+    this.clearConfirmTimer()
+    this.updateGlobalColor(hex)
+  },
 
-  async onCanvasTap(e: WechatMiniprogram.TouchEvent) {
-    if (!this.data.eyedropper) {
-      // tap anywhere on card to replace photo
-      const x = e.detail.x
-      const y = e.detail.y
-      if (!this.isPointInCard(x, y)) return
-      await this.pickUserPhoto()
-      return
-    }
 
-    // eyedropper mode: pick from current rendered canvas pixel
-    const x = Math.floor(e.detail.x)
-    const y = Math.floor(e.detail.y)
-    if (!this.isPointInPhotoArea(x, y)) return
+
+  pickColorAt(x: number, y: number) {
     wx.canvasGetImageData({
       canvasId: 'mixCanvas',
-      x,
-      y,
+      x: Math.floor(x),
+      y: Math.floor(y),
       width: 1,
       height: 1,
       success: (res) => {
         const d = res.data
         const hex = rgbToHex(d[0], d[1], d[2])
-        if (this.data.colorTarget === 'bg') {
-          this.setData({ bgColor: hex })
-        } else {
-          this.setData({ solidColor: hex })
-        }
-        this.draw()
+        this.updateGlobalColor(hex)
       },
     }, this)
   },
 
-	  async pickUserPhoto() {
-	    try {
-	      const res = await wx.chooseMedia({
-        count: 1,
-        mediaType: ['image'],
-        sourceType: ['album'],
-        sizeType: ['original'],
+  async pickUserPhoto() {
+    try {
+      const res = await new Promise<any>((resolve, reject) => {
+        wx.chooseImage({
+          count: 1,
+          sizeType: ['original'],
+          sourceType: ['album'], // 直接调起相册，不再弹出拍照选项
+          success: resolve,
+          fail: reject
+        })
       })
-	      const file = res.tempFiles && res.tempFiles[0]
-	      const filePath = file ? file.tempFilePath : ''
-	      if (!filePath) return
+      const filePath = res.tempFilePaths[0]
+      if (!filePath) return
+        
+        // 选择新图时，先清空旧的元数据，显示加载状态
+        this.setData({
+          timeText: '正在提取时间...',
+          locationText: '正在定位中...'
+        })
+        this.draw()
+
 	      void this.tryResolveMetaFromExif(filePath)
 	      const cropped = await this.cropTo4x3(filePath)
 	      await this.loadPhoto(cropped)
@@ -425,50 +546,14 @@ Page({
 	    })
 	  },
 
+  // 彻底关闭自动提取，改为引导用户手动输入
   async tryResolveMetaFromExif(filePath: string) {
-    const taken = await this.extractExifDateTime(filePath)
+    const taken = await this.extractExifDateTime(filePath);
     if (taken) {
-      this.setData({ timeText: taken })
+      this.setData({ timeText: taken });
+      this.draw();
     }
-
-    const gps = await this.extractGpsFromJpeg(filePath)
-    if (!gps) return
-
-    const wxAny = wx as WechatMiniprogram.Wx & {
-      cloud?: {
-        callFunction?: (options: {
-          name: string
-          data?: unknown
-        }) => Promise<{ result?: unknown }>
-      }
-    }
-    if (!wxAny.cloud || !wxAny.cloud.callFunction) return
-
-    try {
-      const envVersion =
-        wx.getAccountInfoSync &&
-        wx.getAccountInfoSync().miniProgram &&
-        wx.getAccountInfoSync().miniProgram.envVersion
-      const debug = envVersion !== 'release'
-      const callRes = await wxAny.cloud.callFunction({
-        name: 'ColorWalk',
-        data: { action: 'reverseGeocode', lat: gps.lat, lon: gps.lon, debug },
-      })
-      const result = (callRes.result || {}) as { ok?: boolean; city?: string; locationText?: string }
-      const locationText =
-        (result && result.ok && result.locationText) ? String(result.locationText) : ''
-      const city = (result && result.ok && result.city) ? String(result.city) : ''
-      if (locationText) {
-        wx.setStorageSync('latestLocationText', locationText)
-        if (city) {
-          wx.setStorageSync('latestCity', city)
-        }
-        this.setData({ locationText })
-        this.draw()
-      }
-    } catch (e) {
-      // ignore
-    }
+    // 不再自动请求定位，点击纯色区域手动输入
   },
 
   extractExifDateTime(filePath: string): Promise<string> {
@@ -479,28 +564,65 @@ Page({
         success: (res) => {
           const buf = res.data as ArrayBuffer
           const u8 = new Uint8Array(buf)
-          // Scan for ASCII pattern: YYYY:MM:DD HH:MM:SS
-          for (let i = 0; i + 19 <= u8.length; i += 1) {
-            const c0 = u8[i]
-            if (c0 < 0x30 || c0 > 0x39) continue
-            const match =
-              u8[i + 4] === 0x3a &&
-              u8[i + 7] === 0x3a &&
-              u8[i + 10] === 0x20 &&
-              u8[i + 13] === 0x3a &&
-              u8[i + 16] === 0x3a
-            if (!match) continue
-            const str = String.fromCharCode(...u8.slice(i, i + 19))
-            if (!/^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}$/.test(str)) continue
-            const datePart = str.slice(0, 10).replace(/:/g, '.')
-            const timePart = str.slice(11, 16)
-            const finalText = `${datePart} ${timePart}`
-            resolve(finalText)
-            return
+          const view = new DataView(buf)
+          
+          const findInIfd = (tiffOffset: number, ifdOffset: number, le: boolean, depth: number): string | null => {
+            if (depth > 5 || ifdOffset + tiffOffset + 2 > u8.length) return null
+            const entries = view.getUint16(tiffOffset + ifdOffset, le)
+            for (let i = 0; i < entries; i++) {
+              const entryOff = tiffOffset + ifdOffset + 2 + i * 12
+              if (entryOff + 12 > u8.length) break
+              const tag = view.getUint16(entryOff, le)
+              if (tag === 0x9003 || tag === 0x0132) {
+                const valOff = view.getUint32(entryOff + 8, le)
+                if (tiffOffset + valOff + 19 <= u8.length) {
+                  return String.fromCharCode(...u8.slice(tiffOffset + valOff, tiffOffset + valOff + 19))
+                }
+              }
+              if (tag === 0x8769) {
+                const subRes = findInIfd(tiffOffset, view.getUint32(entryOff + 8, le), le, depth + 1)
+                if (subRes) return subRes
+              }
+            }
+            return null
+          }
+
+          let offset = 2
+          while (offset + 10 < u8.length) {
+            const marker = u8[offset + 1]
+            const size = view.getUint16(offset + 2, false)
+            if (u8[offset] !== 0xff || marker === 0xda || marker === 0xd9) break
+
+            if (marker === 0xe1) {
+              const isExif = String.fromCharCode(...u8.slice(offset + 4, offset + 8)) === 'Exif'
+              if (isExif) {
+                const tiffOffset = offset + 10
+                const le = String.fromCharCode(u8[tiffOffset], u8[tiffOffset+1]) === 'II'
+                const firstIfd = view.getUint32(tiffOffset + 4, le)
+                const res = findInIfd(tiffOffset, firstIfd, le, 0)
+                if (res && res.length >= 10) {
+                  const datePart = res.slice(0, 10).replace(/:/g, '.')
+                  const timePart = res.slice(11, 16)
+                  resolve(`${datePart} ${timePart}`)
+                  return
+                }
+              }
+            }
+            offset += 2 + size
+          }
+          // 彻底兜底：暴力全文件扫描日期格式字符串
+          for (let i = 0; i + 19 <= Math.min(u8.length, 100000); i++) {
+            if (u8[i+4] === 0x3a && u8[i+7] === 0x3a && u8[i+10] === 0x20) {
+              const str = String.fromCharCode(...u8.slice(i, i + 19))
+              if (/^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}$/.test(str)) {
+                resolve(str.slice(0,10).replace(/:/g, '.') + ' ' + str.slice(11, 16))
+                return
+              }
+            }
           }
           resolve('')
         },
-        fail: () => resolve(''),
+        fail: () => resolve('')
       })
     })
   },
@@ -667,9 +789,60 @@ Page({
     return x >= px && x <= px + c.w && y >= py && y <= py + c.photoH
   },
 
+  onCanvasTap(e: WechatMiniprogram.TouchEvent) {
+    const { x, y } = e.detail
+    
+    // 如果吸管处于激活状态，禁掉所有其他直接点击逻辑（如换图），确保取色优先
+    if (this.data.eyedropper) {
+      this.setData({ eyedropperPos: { x, y } })
+      this.pickColorAt(x, y)
+      // 开启 10s 倒计时（如果你之前有这部分逻辑，此处会复用）
+      this.resetConfirmTimer()
+      return
+    }
+    
+    // 1. 如果点击的是图片区域，触发换图逻辑
+    if (this.isPointInPhotoArea(x, y)) {
+      this.pickUserPhoto()
+      return
+    }
+    
+    // 2. 如果点击的是纯色区域（顶部卡片部分），唤起编辑逻辑
+    const c = this._card
+    const isSolidArea = x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.solidH
+    
+    if (isSolidArea) {
+      wx.showModal({
+        title: '编辑文本',
+        editable: true,
+        placeholderText: '请输入地点或日期',
+        content: this.data.locationText,
+        success: (res) => {
+          if (res.confirm) {
+            this.setData({ locationText: res.content || '' })
+            this.draw()
+          }
+        }
+      })
+      return
+    }
+  },
+
   onTouchStart(e: WechatMiniprogram.TouchEvent) {
     const touches = e.touches || []
     if (!touches.length) return
+
+    if (this.data.eyedropper) {
+      const x = touches[0].x
+      const y = touches[0].y
+      if (this.isPointInCard(x, y)) {
+        this.setData({ eyedropperPos: { x, y } })
+        this.pickColorAt(x, y)
+        this.resetConfirmTimer()
+        this._touchMode = 'eyedropper'
+      }
+      return
+    }
 
     // only operate when touch begins inside photo area
     if (!this.isPointInPhotoArea(touches[0].x, touches[0].y)) return
@@ -696,6 +869,18 @@ Page({
   onTouchMove(e: WechatMiniprogram.TouchEvent) {
     const touches = e.touches || []
     if (!touches.length) return
+
+    if (this.data.eyedropper && (this._touchMode === 'eyedropper')) {
+      const x = touches[0].x
+      const y = touches[0].y
+      if (this.isPointInCard(x, y)) {
+        this.setData({ eyedropperPos: { x, y } })
+        this.pickColorAt(x, y)
+        this.resetConfirmTimer()
+      }
+      return
+    }
+
     if (this._touchMode === 'pan' && touches.length === 1) {
       const t = touches[0]
       const dx = t.x - this._touchStart.x
@@ -780,19 +965,31 @@ Page({
     ctx.drawImage(this.data.photoPath, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH)
     ctx.restore()
 
-    // text in solid area
+    // text in solid area (支持多行换行)
     const midY = c.y + c.solidH / 2
     ctx.setTextAlign('center')
-    ctx.setFillStyle('rgba(0,0,0,0.78)')
-    ctx.setFontSize(14)
-    const line1 = this.data.locationText
-    const line2 = this.data.timeText
-    if (line1) {
-      ctx.fillText(line1, c.x + c.w / 2, midY - 6)
-      ctx.setFontSize(12)
-      ctx.fillText(line2, c.x + c.w / 2, midY + 14)
+    
+    const mainText = this.data.locationText
+    
+    if (!mainText) {
+      // 仅预览可见的引导
+      ctx.setFontSize(14)
+      ctx.setFillStyle('rgba(0,0,0,0.3)')
+      ctx.fillText('点击编辑文本', c.x + c.w / 2, midY + 6)
     } else {
-      ctx.fillText(line2, c.x + c.w / 2, midY + 6)
+      ctx.setFillStyle('rgba(0,0,0,0.78)')
+      const lines = mainText.split('\n')
+      const fontSize = 14
+      const lineHeight = fontSize * 1.5
+      
+      // 计算起始 Y 轴偏移，确保整体居中
+      const totalH = lines.length * lineHeight
+      let startY = midY - (totalH / 2) + (fontSize / 2) + 2
+      
+      ctx.setFontSize(fontSize)
+      lines.forEach((line, index) => {
+        ctx.fillText(line.trim(), c.x + c.w / 2, startY + index * lineHeight)
+      })
     }
 
     ctx.restore()
@@ -845,8 +1042,8 @@ Page({
   async onDownload() {
     try {
       wx.showLoading({ title: '生成中...', mask: true })
-      const outW = 1920
-      const outH = 2560
+      const outW = 1080
+      const outH = 1440
       await this.drawExport(outW, outH)
       wx.canvasToTempFilePath(
         {
@@ -858,6 +1055,9 @@ Page({
           fileType: 'jpg',
           quality: 0.95,
           success: async (res) => {
+            // 生成图片成功立即保存颜色，不再等待相册写入回调，确保保存成功率
+            this.saveToHistory(this.data.solidColor)
+            
             try {
               await wx.saveImageToPhotosAlbum({ filePath: res.tempFilePath })
               wx.showToast({ title: '已保存到相册', icon: 'success' })
@@ -881,59 +1081,64 @@ Page({
   drawExport(outW: number, outH: number) {
     return new Promise<void>((resolve) => {
       const ctx = wx.createCanvasContext('exportCanvas', this)
-      ctx.setFillStyle(this.data.bgColor)
-      ctx.fillRect(0, 0, outW, outH)
-
-      const cardW = Math.floor(outW * 0.78)
-      const cardH = Math.floor((cardW * 4) / 3)
-      const cardX = Math.floor((outW - cardW) / 2)
-      const cardY = Math.floor((outH - cardH) / 2)
+      
+      // 直接绘制卡片内容，铺满整个 exportCanvas (3:4)
+      const cardW = outW
+      const cardH = outH
+      const cardX = 0
+      const cardY = 0
       const solidH = Math.floor((cardH * 21) / 48)
       const photoH = cardH - solidH
 
-      // card fill
-      this.drawRoundRect(ctx, cardX, cardY, cardW, cardH, 40, this.data.solidColor)
-      ctx.setStrokeStyle('rgba(255,255,255,0.20)')
-      ctx.setLineWidth(1)
-      this.strokeRoundRect(ctx, cardX, cardY, cardW, cardH, 40)
+      // 背景（卡片主色）
+      this.drawRoundRect(ctx, cardX, cardY, cardW, cardH, 0, this.data.solidColor)
 
-      // clip and draw photo
+      // 顶部拼色区域
       ctx.save()
-      this.clipRoundRect(ctx, cardX, cardY, cardW, cardH, 40)
       ctx.setFillStyle(this.data.solidColor)
       ctx.fillRect(cardX, cardY, cardW, solidH)
 
+      // 照片区域裁剪并绘制
       const photoX = cardX
       const photoY = cardY + solidH
       ctx.save()
       ctx.beginPath()
-	      ctx.rect(photoX, photoY, cardW, photoH)
-	      ctx.clip()
+      ctx.rect(photoX, photoY, cardW, photoH)
+      ctx.clip()
 
-	      // Export also uses "cover" fit to match on-screen cropping.
-	      const fitScale = Math.max(cardW / this._img.w, photoH / this._img.h)
-	      const drawW = this._img.w * fitScale * this._scale
-	      const drawH = this._img.h * fitScale * this._scale
-	      const centerX = photoX + cardW / 2 + this._offset.x * (outW / (this._canvasW || 1))
-	      const centerY = photoY + photoH / 2 + this._offset.y * (outW / (this._canvasW || 1))
-	      ctx.drawImage(this.data.photoPath, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH)
+      // 导出计算缩放比例
+      const fitScale = Math.max(cardW / this._img.w, photoH / this._img.h)
+      const drawW = this._img.w * fitScale * this._scale
+      const drawH = this._img.h * fitScale * this._scale
+      
+      // 这里的偏移需要根据导出分辨率进行等比放缩
+      const exportScale = outW / (this._card.w || 1)
+      const centerX = photoX + cardW / 2 + this._offset.x * exportScale
+      const centerY = photoY + photoH / 2 + this._offset.y * exportScale
+      
+      ctx.drawImage(this.data.photoPath, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH)
       ctx.restore()
 
-      // text
+      // 绘制文字 (支持多行导出)
       const midY = cardY + solidH / 2
       ctx.setTextAlign('center')
       ctx.setFillStyle('rgba(0,0,0,0.78)')
-      ctx.setFontSize(36)
-      if (this.data.locationText) {
-        ctx.fillText(this.data.locationText, cardX + cardW / 2, midY - 10)
-        ctx.setFontSize(28)
-        ctx.fillText(this.data.timeText, cardX + cardW / 2, midY + 34)
-      } else {
-        ctx.fillText(this.data.timeText, cardX + cardW / 2, midY + 12)
+      
+      const mainText = this.data.locationText
+      if (mainText) {
+        const lines = mainText.split('\n')
+        const fontSize = 40
+        const lineHeight = fontSize * 1.5
+        const totalH = lines.length * lineHeight
+        let startY = midY - (totalH / 2) + (fontSize / 2) + 4
+        
+        ctx.setFontSize(fontSize)
+        lines.forEach((line, index) => {
+          ctx.fillText(line.trim(), cardX + cardW / 2, startY + index * lineHeight)
+        })
       }
 
       ctx.restore()
-
       ctx.draw(false, () => resolve())
     })
   },

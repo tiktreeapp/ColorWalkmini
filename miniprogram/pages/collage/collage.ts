@@ -954,10 +954,10 @@ Page({
 
     ctx.setFillStyle('rgba(0, 0, 0, 0.55)')
     ctx.setFontSize(24)
-    ctx.fillText('心情', padding + cardW + 88, cardY + 32)
+    ctx.fillText('心情 ', padding + cardW + 24, cardY + 32)
     ctx.setFillStyle('#111111')
     ctx.setFontSize(24)
-    ctx.fillText(moodDisplay, padding + cardW + 148, cardY + 32)
+    ctx.fillText(moodDisplay, padding + cardW + 84, cardY + 32)
 
     const gridTop = cardY + cardH + 38
     const gridAreaHeight = canvasHeight - gridTop - padding
