@@ -103,6 +103,7 @@ Page({
   _offsetStart: { x: 0, y: 0 },
   _pinchDistStart: 0,
   _scaleStart: 1,
+  _hasMoved: false, // 记录当前触摸周期是否发生了位移
   _touchId0: 0,
   _touchId1: 0,
   _confirmTimer: null as any,
@@ -123,6 +124,79 @@ Page({
 
   onReady() {
     this.measureAndInit()
+  },
+
+  onTouchStart(e: WechatMiniprogram.TouchEvent) {
+    const touches = e.touches || []
+    if (!touches.length) return
+    
+    this._hasMoved = false
+    
+    // 如果吸管处于激活状态，优先处理吸管
+    if (this.data.eyedropper) {
+      const x = touches[0].x
+      const y = touches[0].y
+      if (this.isPointInCard(x, y)) {
+        this.setData({ eyedropperPos: { x, y } })
+        this.pickColorAt(x, y)
+        this.resetConfirmTimer()
+        this._touchMode = 'eyedropper'
+      }
+      return
+    }
+
+    if (touches.length === 1) {
+      this._touchMode = 'pan'
+      this._touchStart = { x: touches[0].clientX, y: touches[0].clientY }
+      this._offsetStart = { ...this._offset }
+    } else if (touches.length >= 2) {
+      this._touchMode = 'pinch'
+      const dx = touches[1].clientX - touches[0].clientX
+      const dy = touches[1].clientY - touches[0].clientY
+      this._pinchDistStart = Math.sqrt(dx * dx + dy * dy)
+      this._scaleStart = this._scale
+    }
+  },
+
+  onTouchMove(e: WechatMiniprogram.TouchEvent) {
+    const touches = e.touches || []
+    if (!touches.length) return
+    
+    if (this._touchMode === 'eyedropper') {
+      const x = touches[0].x
+      const y = touches[0].y
+      this.setData({ eyedropperPos: { x, y } })
+      this.pickColorAt(x, y)
+      return
+    }
+
+    if (this._touchMode === 'pan' && touches.length === 1) {
+      const dx = touches[0].clientX - this._touchStart.x
+      const dy = touches[0].clientY - this._touchStart.y
+      
+      // 位移判定：超过 5px 视为拖拽，禁掉点击换图
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        this._hasMoved = true
+      }
+
+      this._offset = {
+        x: this._offsetStart.x + dx,
+        y: this._offsetStart.y + dy
+      }
+      this.draw()
+    } else if (this._touchMode === 'pinch' && touches.length >= 2) {
+      this._hasMoved = true
+      const dx = touches[1].clientX - touches[0].clientX
+      const dy = touches[1].clientY - touches[0].clientY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const ratio = dist / (this._pinchDistStart || 1)
+      this._scale = Math.max(0.3, Math.min(5, this._scaleStart * ratio))
+      this.draw()
+    }
+  },
+
+  onTouchEnd() {
+    this._touchMode = ''
   },
 
   onShow() {
@@ -475,10 +549,11 @@ Page({
       const filePath = res.tempFilePaths[0]
       if (!filePath) return
         
-        // 选择新图时，先清空旧的元数据，显示加载状态
+        // 选择新图时，重置图片状态但不提示定位
+        this._scale = 1
+        this._offset = { x: 0, y: 0 }
         this.setData({
-          timeText: '正在提取时间...',
-          locationText: '正在定位中...'
+          timeText: '正在读取拍摄时间...', 
         })
         this.draw()
 
@@ -546,14 +621,13 @@ Page({
 	    })
 	  },
 
-  // 彻底关闭自动提取，改为引导用户手动输入
+  // 仅保留时间提取，彻底去掉定位逻辑
   async tryResolveMetaFromExif(filePath: string) {
     const taken = await this.extractExifDateTime(filePath);
     if (taken) {
       this.setData({ timeText: taken });
       this.draw();
     }
-    // 不再自动请求定位，点击纯色区域手动输入
   },
 
   extractExifDateTime(filePath: string): Promise<string> {
@@ -790,17 +864,22 @@ Page({
   },
 
   onCanvasTap(e: WechatMiniprogram.TouchEvent) {
-    const { x, y } = e.detail
-    
-    // 如果吸管处于激活状态，禁掉所有其他直接点击逻辑（如换图），确保取色优先
+    // 如果吸管处于激活状态，禁掉所有其他直接点击逻辑，确保取色优先
     if (this.data.eyedropper) {
+      const { x, y } = e.detail
       this.setData({ eyedropperPos: { x, y } })
       this.pickColorAt(x, y)
-      // 开启 10s 倒计时（如果你之前有这部分逻辑，此处会复用）
       this.resetConfirmTimer()
       return
     }
-    
+
+    // 如果当前手指移动过，不视为点击更换照片
+    if (this._hasMoved) {
+      this._hasMoved = false
+      return
+    }
+
+    const { x, y } = e.detail
     // 1. 如果点击的是图片区域，触发换图逻辑
     if (this.isPointInPhotoArea(x, y)) {
       this.pickUserPhoto()
@@ -817,10 +896,36 @@ Page({
         editable: true,
         placeholderText: '请输入地点或日期',
         content: this.data.locationText,
-        success: (res) => {
+        success: async (res) => {
           if (res.confirm) {
-            this.setData({ locationText: res.content || '' })
-            this.draw()
+            const newText = res.content || ''
+            if (!newText) {
+              this.setData({ locationText: '' })
+              this.draw()
+              return
+            }
+
+            wx.showLoading({ title: '安全审核中...', mask: true })
+            try {
+              const checkRes = await (wx as any).cloud.callFunction({
+                name: 'ColorWalk',
+                data: { action: 'msgSecCheck', content: newText }
+              })
+              
+              if (checkRes.result && !checkRes.result.ok) {
+                wx.showToast({ title: '内容不合规，请重新输入', icon: 'none' })
+                return
+              }
+              
+              this.setData({ locationText: newText })
+              this.draw()
+            } catch (e) {
+              // 网络异常等情况，为不影响用户体验，可根据策略放行或阻断
+              this.setData({ locationText: newText })
+              this.draw()
+            } finally {
+              wx.hideLoading()
+            }
           }
         }
       })
@@ -828,85 +933,7 @@ Page({
     }
   },
 
-  onTouchStart(e: WechatMiniprogram.TouchEvent) {
-    const touches = e.touches || []
-    if (!touches.length) return
 
-    if (this.data.eyedropper) {
-      const x = touches[0].x
-      const y = touches[0].y
-      if (this.isPointInCard(x, y)) {
-        this.setData({ eyedropperPos: { x, y } })
-        this.pickColorAt(x, y)
-        this.resetConfirmTimer()
-        this._touchMode = 'eyedropper'
-      }
-      return
-    }
-
-    // only operate when touch begins inside photo area
-    if (!this.isPointInPhotoArea(touches[0].x, touches[0].y)) return
-
-    if (touches.length === 1) {
-      this._touchMode = 'pan'
-      this._touchStart = { x: touches[0].x, y: touches[0].y }
-      this._offsetStart = { ...this._offset }
-      this._touchId0 = touches[0].identifier
-      return
-    }
-
-    if (touches.length >= 2) {
-      this._touchMode = 'pinch'
-      this._touchId0 = touches[0].identifier
-      this._touchId1 = touches[1].identifier
-      const dx = touches[0].x - touches[1].x
-      const dy = touches[0].y - touches[1].y
-      this._pinchDistStart = Math.sqrt(dx * dx + dy * dy)
-      this._scaleStart = this._scale
-    }
-  },
-
-  onTouchMove(e: WechatMiniprogram.TouchEvent) {
-    const touches = e.touches || []
-    if (!touches.length) return
-
-    if (this.data.eyedropper && (this._touchMode === 'eyedropper')) {
-      const x = touches[0].x
-      const y = touches[0].y
-      if (this.isPointInCard(x, y)) {
-        this.setData({ eyedropperPos: { x, y } })
-        this.pickColorAt(x, y)
-        this.resetConfirmTimer()
-      }
-      return
-    }
-
-    if (this._touchMode === 'pan' && touches.length === 1) {
-      const t = touches[0]
-      const dx = t.x - this._touchStart.x
-      const dy = t.y - this._touchStart.y
-      this._offset = { x: this._offsetStart.x + dx, y: this._offsetStart.y + dy }
-      this.constrainTransform()
-      this.draw()
-      return
-    }
-
-    if (this._touchMode === 'pinch' && touches.length >= 2) {
-      const t0 = touches[0]
-      const t1 = touches[1]
-      const dx = t0.x - t1.x
-      const dy = t0.y - t1.y
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      const next = this._scaleStart * (dist / (this._pinchDistStart || 1))
-      this._scale = clamp(next, 1, 3)
-      this.constrainTransform()
-      this.draw()
-    }
-  },
-
-  onTouchEnd() {
-    this._touchMode = ''
-  },
 
 	  constrainTransform() {
 	    const c = this._card
@@ -1106,15 +1133,16 @@ Page({
       ctx.rect(photoX, photoY, cardW, photoH)
       ctx.clip()
 
-      // 导出计算缩放比例
-      const fitScale = Math.max(cardW / this._img.w, photoH / this._img.h)
-      const drawW = this._img.w * fitScale * this._scale
-      const drawH = this._img.h * fitScale * this._scale
+      // 按照当前手动缩放后的比例计算绘制宽高
+      const baseFitScale = Math.max(cardW / this._img.w, photoH / this._img.h)
+      const currentScale = baseFitScale * this._scale
+      const drawW = this._img.w * currentScale
+      const drawH = this._img.h * currentScale
       
-      // 这里的偏移需要根据导出分辨率进行等比放缩
-      const exportScale = outW / (this._card.w || 1)
-      const centerX = photoX + cardW / 2 + this._offset.x * exportScale
-      const centerY = photoY + photoH / 2 + this._offset.y * exportScale
+      // 这里的偏移量需要根据导出画布比例进行真实缩放
+      const exportCoordScale = outW / (this._card.w || 1)
+      const centerX = photoX + cardW / 2 + this._offset.x * exportCoordScale
+      const centerY = photoY + photoH / 2 + this._offset.y * exportCoordScale
       
       ctx.drawImage(this.data.photoPath, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH)
       ctx.restore()

@@ -234,6 +234,22 @@ exports.main = async (event) => {
   const needCity = !!(event && event.needCity)
   const action = (event && event.action) || ''
 
+  if (action === 'msgSecCheck') {
+    const text = event.content || ''
+    if (!text) return { ok: true }
+    try {
+      await cloud.openapi.security.msgSecCheck({
+        content: text,
+        version: 2,
+        scene: 1,
+        openid: cloud.getWXContext().OPENID
+      })
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, code: 'RISK_TEXT', message: '内容包含敏感词汇' }
+    }
+  }
+
   if (action === 'reverseGeocode') {
     const lat = event && typeof event.lat === 'number' ? event.lat : NaN
     const lon = event && typeof event.lon === 'number' ? event.lon : NaN
